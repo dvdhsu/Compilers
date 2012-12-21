@@ -68,6 +68,10 @@ nonterminal programc program;
 nonterminal Classes class_list;
 nonterminal class_c class;
 nonterminal Features dummy_feature_list;
+nonterminal Feature feature;
+nonterminal Formals dummy_formal_list;
+nonterminal formalc formal;
+nonterminal Expression expression;
 
 /* Precedence declarations go here. */
 
@@ -99,4 +103,143 @@ class
 dummy_feature_list
 	::= /* empty */
 	    {: RESULT = new Features(curr_lineno()); :}
+	|   /* non-empty */ 
+		dummy_feature_list:df feature:f
+	  	{: RESULT = df.appendElement(f); :}
 	;
+
+feature
+	::= /* method with no formals */ 
+		OBJECTID:oid LPAREN RPAREN COLON TYPEID:tid LBRACE expression:e RBRACE
+		{: RESULT = new method(curr_lineno(), oid, new Formals(curr_lineno()), tid, e); :}
+	|	/* method with one or more formals */ 
+		OBJECTID:oid LPAREN dummy_formal_list:dfl formal:f RPAREN COLON TYPEID:tid LBRACE expression:e RBRACE 
+		{: RESULT = new method(curr_lineno(), oid, dfl.appendElement(f), tid, e); :}
+	|   /* attr without assignment */ 
+		OBJECTID:id TYPEID:type 
+		{: RESULT = new attr(curr_lineno(), id, type, no_expr(curr_lineno())); :}
+	|	OBJECTID:id TYPEID:type LBRACE ASSIGN expression:expr RBRACE
+		{: RESULT = new attr(curr_lineno(), id, type, expr); :}
+	;
+
+dummy_formal_list
+	::= /* empty */ 
+		{: RESULT = new Formals(curr_lineno()); :} 
+	|	/* one or more formals */ 
+		dummy_formal_list:df COMMA formal:f
+		{: RESULT = df.appendElement(f); :}
+	;
+
+formal 
+	::= OBJECTID:oid COLON TYPEID:tid
+		{: RESULT = new formalc(curr_lineno(), oid, tid); :}
+	;
+
+expression
+	::= /* assignment */
+		OBJECTID:oid ASSIGN expression:e
+		{: RESULT = new assign(curr_lineno(), oid, e); :}
+	::= /*  */ expression:e	DOT OBJECTID:oid LPAREN dummy_expression_list
+	::= 
+	::= /* if statement */
+		IF expression:e1 THEN expression:e2 ELSE expression:e3 FI
+		{: RESULT = new cond(curr_lineno(), e1, e2, e3); :}
+	::= /* while loop */
+		WHILE expression:e1 LOOP expression:e2 POOL
+		{: RESULT = new loop(curr_lineno(), e1, e2); :}
+	::= /* expr_list TODO */
+	::= /* let TODO */ 
+	::= /* cases TODO */
+	::= /* new */
+		NEW TYPEID:tid
+		{: RESULT = new new_(curr_lineno(), tid); :}
+	::= /* isvoid */
+		ISVOID expression:e
+		{: RESULT = new isvoid(curr_lineno(), e); :}
+	::= /* subtraction */
+		expression:e1 MINUS expression:e2
+		{: RESULT = new sub(curr_lineno(), e1, e2); :}
+	::= /* addition */
+		expression:e1 PLUS expression:e2
+		{: RESULT = new plus(curr_lineno(), e1, e2); :}
+	::= /* division */
+		expression:e1 DIV expression:e2
+		{: RESULT = new divide(curr_lineno(), e1, e2); :}
+	::= /* negation */
+		NEG expression:e
+		{: RESULT = new neg(curr_lineno(), e); :} 
+	::= /* less than */	
+		expression:e1 LT expression: e2
+		{: RESULT = new lt(curr_lineno(), e1, e2); :}
+	::= /* less than equal to */ 
+		expression:e1 LT EQ expression:e2
+		{: RESULT = new leq(curr_lineno(), e1, e2); :}
+	::= /* equal */
+		expression:e1 EQ expression:e2
+		{: RESULT = new eq(curr_lineno(), e1, e2); :}
+	::= /* not */ 
+		NOT expression:e
+		{: RESULT = new no_expr(curr_lineno(), e); :}
+	::= /* parentheses */ 
+		LPAREN expression:e RPAREN
+		{: RESULT = e; :}
+	::= /* object */ 
+		OBJECTID:oid
+		{: RESULT = new object(curr_lineno(), oid); :}
+	::= /* string constant */ 
+		STR_CONST:s
+		{: RESULT = new string_const(curr_lineno(), s); :}
+	::= /* integer constant */ 
+		INT_CONST:i
+		{: RESULT = new int_const(curr_lineno(), i); :}
+	::= /* boolean constant */ 
+		BOOL_CONST:b
+		{: RESULT = new bool_const(curr_lineno(), b); :}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
