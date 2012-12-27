@@ -72,6 +72,7 @@ nonterminal Feature feature;
 nonterminal Formals dummy_formal_list;
 nonterminal formalc formal;
 nonterminal Expression expression;
+nonterminal Expressions expressions;
 nonterminal Case branch; // since branch is the only "useful" case; also avoids 'case', a Java keyword
 nonterminal Cases case_list;
 
@@ -146,10 +147,16 @@ case_list
 	::= /* one case */
 		branch:b 
 		{: RESULT = new Cases(curr_lineno()).appendElement(b); :}
-	::= /* more than one case */
+	::= /*multiple cases */
 		case_list:cl branch:b
 		{: RESULT = cl.appendElement(b); :}
-
+expressions 
+	::= /* one expression */ 
+		expression:e SEMI
+		{: RESULT = new Expressions(curr_lineno()).appendElement(e); :}
+	::=	/* multiple expressions */
+		expressions:el expression:e
+		{: RESULT = el.appendElement(e); :} 
 expression
 	::= /* assignment */
 		OBJECTID:oid ASSIGN expression:e
@@ -162,12 +169,15 @@ expression
 	::= /* while loop */
 		WHILE expression:e1 LOOP expression:e2 POOL
 		{: RESULT = new loop(curr_lineno(), e1, e2); :}
-	::= /* expr_list TODO */
-	::= /* let TODO */ 
+	::= /* expr_list */
+		LBRACE expressions:el RBRACE
+		{: RESULT = new block(curr_lineno(), el); :} 
+	::= /* let statement TODO */ 
+		LET_STMT OBJECTID:oid TYPEID:tid 
  
 	::= /* case statement */
 		CASE expression:e case_list:cl ESAC
-		{: RESULT = new typecase(curr_lineno(), e, cl); :}
+		{: RESULT = new typecase(curr_lineno(), e, cl); 	:}
 	::= /* new */
 		NEW TYPEID:tid
 		{: RESULT = new new_(curr_lineno(), tid); :}
