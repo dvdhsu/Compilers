@@ -72,6 +72,8 @@ nonterminal Feature feature;
 nonterminal Formals dummy_formal_list;
 nonterminal formalc formal;
 nonterminal Expression expression;
+nonterminal Case branch; // since branch is the only "useful" case; also avoids 'case', a Java keyword
+nonterminal Cases case_list;
 
 /* Precedence declarations go here. */
 
@@ -118,14 +120,15 @@ feature
 	|   /* attr without assignment */ 
 		OBJECTID:id TYPEID:type 
 		{: RESULT = new attr(curr_lineno(), id, type, no_expr(curr_lineno())); :}
-	|	OBJECTID:id TYPEID:type LBRACE ASSIGN expression:expr RBRACE
+	|	/* attr with assignment */
+		OBJECTID:id TYPEID:type LBRACE ASSIGN expression:expr RBRACE
 		{: RESULT = new attr(curr_lineno(), id, type, expr); :}
 	;
 
 dummy_formal_list
 	::= /* empty */ 
 		{: RESULT = new Formals(curr_lineno()); :} 
-	|	/* one or more formals */ 
+	|	/* non-empty */ 
 		dummy_formal_list:df COMMA formal:f
 		{: RESULT = df.appendElement(f); :}
 	;
@@ -134,13 +137,25 @@ formal
 	::= OBJECTID:oid COLON TYPEID:tid
 		{: RESULT = new formalc(curr_lineno(), oid, tid); :}
 	;
+branch
+	::=  /* single branch */
+		OBJECTID:oid COLON TYPEID:tid DARROW expression:e SEMI
+		{: RESULT = new branch(curr_lineno(), oid, tid, e); :}
+
+case_list
+	::= /* one case */
+		branch:b 
+		{: RESULT = new Cases(curr_lineno()).appendElement(b); :}
+	::= /* more than one case */
+		case_list:cl branch:b
+		{: RESULT = cl.appendElement(b); :}
 
 expression
 	::= /* assignment */
 		OBJECTID:oid ASSIGN expression:e
 		{: RESULT = new assign(curr_lineno(), oid, e); :}
-	::= /*  */ expression:e	DOT OBJECTID:oid LPAREN dummy_expression_list
-	::= 
+	::= /* TODO */ expression:e	DOT OBJECTID:oid LPAREN dummy_expression_list
+	::= /* TODO */ 
 	::= /* if statement */
 		IF expression:e1 THEN expression:e2 ELSE expression:e3 FI
 		{: RESULT = new cond(curr_lineno(), e1, e2, e3); :}
@@ -149,7 +164,10 @@ expression
 		{: RESULT = new loop(curr_lineno(), e1, e2); :}
 	::= /* expr_list TODO */
 	::= /* let TODO */ 
-	::= /* cases TODO */
+ 
+	::= /* case statement */
+		CASE expression:e case_list:cl ESAC
+		{: RESULT = new typecase(curr_lineno(), e, cl); :}
 	::= /* new */
 		NEW TYPEID:tid
 		{: RESULT = new new_(curr_lineno(), tid); :}
@@ -162,6 +180,9 @@ expression
 	::= /* addition */
 		expression:e1 PLUS expression:e2
 		{: RESULT = new plus(curr_lineno(), e1, e2); :}
+	::= /* multiplication */
+		expression:e1 MULT expression:e2
+		{: RESULT = new mult(curr_lineno(), e1, e2); :} 
 	::= /* division */
 		expression:e1 DIV expression:e2
 		{: RESULT = new divide(curr_lineno(), e1, e2); :}
