@@ -72,7 +72,7 @@ nonterminal Feature feature;
 nonterminal Formals dummy_formal_list;
 nonterminal formalc formal;
 nonterminal Expression expression;
-nonterminal Expressions expressions;
+nonterminal Expressions block_expressions, comma_expressions; // two types of expression lists
 nonterminal Case branch; // since branch is the only "useful" case; also avoids 'case', a Java keyword
 nonterminal Cases case_list;
 
@@ -150,19 +150,35 @@ case_list
 	::= /*multiple cases */
 		case_list:cl branch:b
 		{: RESULT = cl.appendElement(b); :}
-expressions 
+
+semi_expressions 
 	::= /* one expression */ 
 		expression:e SEMI
 		{: RESULT = new Expressions(curr_lineno()).appendElement(e); :}
 	::=	/* multiple expressions */
 		expressions:el expression:e
 		{: RESULT = el.appendElement(e); :} 
+
+comma_expressions
+	::= /* empty */
+		{: RESULT = new Expressions(curr_lineno()); :}
+	::= /* non-empty */
+		comma_expressions:el COMMA expression:e
+		{: RESULT = el.appendElement(e); :}
+
 expression
 	::= /* assignment */
 		OBJECTID:oid ASSIGN expression:e
 		{: RESULT = new assign(curr_lineno(), oid, e); :}
 	::= /* TODO */ expression:e	DOT OBJECTID:oid LPAREN dummy_expression_list
-	::= /* TODO */ 
+	::= /* self dispatch with no parameters */ 
+		OBJECTID:oid LPAREN RPAREN
+		{: RESULT = new dispatch(curr_lineno(), self, oid, new Expressions(curr_lineno())); :}
+	::= /* self dispatch with parameters */
+		OBJECTID:oid LPAREN comma_expressions:el expression:e RPAREN
+		{: RESULT = new dispatch(curr_lineno(), self, oid, el.appendElement(e)); :}
+	::= 
+
 	::= /* if statement */
 		IF expression:e1 THEN expression:e2 ELSE expression:e3 FI
 		{: RESULT = new cond(curr_lineno(), e1, e2, e3); :}
