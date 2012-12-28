@@ -170,7 +170,21 @@ expression
 	::= /* assignment */
 		OBJECTID:oid ASSIGN expression:e
 		{: RESULT = new assign(curr_lineno(), oid, e); :}
-	::= /* TODO */ expression:e	DOT OBJECTID:oid LPAREN dummy_expression_list
+	::= /* dispatch without typeID, without parameters */ 
+		expression:e DOT OBJECTID:oid LPAREN RPAREN
+		{: RESULT = new dispatch(curr_lineno(), e, oid, new Expressions(curr_lineno())); :}
+	::= /* dispatch without typeID, with parameters */
+		expression:e1 DOT OBJECTID:oid LPAREN comma_expressions:el expression:e2 RPAREN
+		{: RESULT = new dispatch(curr_lineno(), e1, oid, el.appendElement(e2)); :}
+	::= /* dispatch with typeID, without parameters */
+		expression:e AT TYPEID:tid DOT OBJECTID:oid LPAREN RPAREN
+		{: RESULT = new static_dispatch(curr_lineno(), e, tid, oid, new Expressions(curr_lineno())); :}
+	::= /* dispatch with typeID, with parameters */
+		expression:e1 AT TYPEID:tid DOT OBJECTID:oid LPAREN comma_expressions:el expression:e2 RPAREN
+		{: RESULT = new static_dispatch(curr_lineno(), e1, tid, oid, el.appendElement(e2)); :}
+
+
+
 	::= /* self dispatch with no parameters */ 
 		OBJECTID:oid LPAREN RPAREN
 		{: RESULT = new dispatch(curr_lineno(), self, oid, new Expressions(curr_lineno())); :}
@@ -189,8 +203,7 @@ expression
 		LBRACE expressions:el RBRACE
 		{: RESULT = new block(curr_lineno(), el); :} 
 	::= /* let statement TODO */ 
-		LET_STMT OBJECTID:oid TYPEID:tid 
- 
+		LET_STMT OBJECTID:oid TYPEID:tid  
 	::= /* case statement */
 		CASE expression:e case_list:cl ESAC
 		{: RESULT = new typecase(curr_lineno(), e, cl); 	:}
