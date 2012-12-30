@@ -72,7 +72,7 @@ nonterminal Feature feature;
 nonterminal Formals dummy_formal_list;
 nonterminal formalc formal;
 nonterminal Expression expression;
-nonterminal Expressions block_expressions, comma_expressions; // two types of expression lists
+nonterminal Expressions semi_expressions, comma_expressions; // two types of expression lists
 nonterminal Case branch; // since branch is the only "useful" case; also avoids 'case', a Java keyword
 nonterminal Cases case_list;
 
@@ -85,10 +85,10 @@ program
 
 class_list
 	/* single class */
-	::= class:c
+	::= class:c 
 	    {: RESULT = (new Classes(curr_lineno())).appendElement(c); :}
 	/* several classes */
-	| class_list:cl class:c
+	| class_list:cl class:c 
 	    {: RESULT = cl.appendElement(c); :}
 	;
 
@@ -100,6 +100,7 @@ class
 				   f, curr_filename()); :}
 	| CLASS TYPEID:n INHERITS TYPEID:p LBRACE dummy_feature_list:f RBRACE SEMI
 	    {: RESULT = new class_c(curr_lineno(), n, p, f, curr_filename()); :}
+	| error SEMI 
 	;
 
 /* Feature list may be empty, but no empty features in list. */
@@ -107,7 +108,7 @@ dummy_feature_list
 	::= /* empty */
 	    {: RESULT = new Features(curr_lineno()); :}
 	|   /* non-empty */ 
-		dummy_feature_list:df feature:f
+		dummy_feature_list:df feature:f SEMI
 	  	{: RESULT = df.appendElement(f); :}
 	;
 
@@ -119,18 +120,20 @@ feature
 		OBJECTID:oid LPAREN dummy_formal_list:dfl formal:f RPAREN COLON TYPEID:tid LBRACE expression:e RBRACE 
 		{: RESULT = new method(curr_lineno(), oid, dfl.appendElement(f), tid, e); :}
 	|   /* attr without assignment */ 
-		OBJECTID:id TYPEID:type 
-		{: RESULT = new attr(curr_lineno(), id, type, no_expr(curr_lineno())); :}
+		OBJECTID:id COLON TYPEID:type 
+		{: RESULT = new attr(curr_lineno(), id, type, new no_expr(curr_lineno())); :}
 	|	/* attr with assignment */
-		OBJECTID:id TYPEID:type LBRACE ASSIGN expression:expr RBRACE
+		OBJECTID:id COLON TYPEID:type ASSIGN expression:expr
 		{: RESULT = new attr(curr_lineno(), id, type, expr); :}
+	|	/* error production */
+		error
 	;
 
 dummy_formal_list
 	::= /* empty */ 
 		{: RESULT = new Formals(curr_lineno()); :} 
 	|	/* non-empty */ 
-		dummy_formal_list:df COMMA formal:f
+		dummy_formal_list:df formal:f COMMA
 		{: RESULT = df.appendElement(f); :}
 	;
 
@@ -142,120 +145,122 @@ branch
 	::=  /* single branch */
 		OBJECTID:oid COLON TYPEID:tid DARROW expression:e SEMI
 		{: RESULT = new branch(curr_lineno(), oid, tid, e); :}
+	;
 
 case_list
 	::= /* one case */
 		branch:b 
-		{: RESULT = new Cases(curr_lineno()).appendElement(b); :}
-	::= /*multiple cases */
+		{: RESULT = (new Cases(curr_lineno())).appendElement(b); :}
+	|  /* multiple cases */
 		case_list:cl branch:b
 		{: RESULT = cl.appendElement(b); :}
+	;
 
 semi_expressions 
 	::= /* one expression */ 
 		expression:e SEMI
-		{: RESULT = new Expressions(curr_lineno()).appendElement(e); :}
-	::=	/* multiple expressions */
-		expressions:el expression:e
-		{: RESULT = el.appendElement(e); :} 
+		{: RESULT = (new Expressions(curr_lineno())).appendElement(e); :}
+	|	/* multiple expressions */
+		semi_expressions:el expression:e SEMI
+		{: RESULT = el.appendElement(e); :}
+	|	/* error production */
+		semi_expressions:el error
+		{: RESULT = el; :}
+	;
 
 comma_expressions
 	::= /* empty */
 		{: RESULT = new Expressions(curr_lineno()); :}
-	::= /* non-empty */
+	|  /* non-empty */
 		comma_expressions:el COMMA expression:e
 		{: RESULT = el.appendElement(e); :}
+	;
 
 expression
 	::= /* assignment */
 		OBJECTID:oid ASSIGN expression:e
 		{: RESULT = new assign(curr_lineno(), oid, e); :}
-	::= /* dispatch without typeID, without parameters */ 
+	|  /* dispatch without typeID, without parameters */ 
 		expression:e DOT OBJECTID:oid LPAREN RPAREN
 		{: RESULT = new dispatch(curr_lineno(), e, oid, new Expressions(curr_lineno())); :}
-	::= /* dispatch without typeID, with parameters */
+	|  /* dispatch without typeID, with parameters */
 		expression:e1 DOT OBJECTID:oid LPAREN comma_expressions:el expression:e2 RPAREN
 		{: RESULT = new dispatch(curr_lineno(), e1, oid, el.appendElement(e2)); :}
-	::= /* dispatch with typeID, without parameters */
+	|  /* dispatch with typeID, without parameters */
 		expression:e AT TYPEID:tid DOT OBJECTID:oid LPAREN RPAREN
 		{: RESULT = new static_dispatch(curr_lineno(), e, tid, oid, new Expressions(curr_lineno())); :}
-	::= /* dispatch with typeID, with parameters */
+	|  /* dispatch with typeID, with parameters */
 		expression:e1 AT TYPEID:tid DOT OBJECTID:oid LPAREN comma_expressions:el expression:e2 RPAREN
 		{: RESULT = new static_dispatch(curr_lineno(), e1, tid, oid, el.appendElement(e2)); :}
-
-
-
-	::= /* self dispatch with no parameters */ 
+	|  /* self dispatch with no parameters */ 
 		OBJECTID:oid LPAREN RPAREN
-		{: RESULT = new dispatch(curr_lineno(), self, oid, new Expressions(curr_lineno())); :}
-	::= /* self dispatch with parameters */
+		{: RESULT = new dispatch(curr_lineno(), (new object(curr_lineno(), new IdSymbol(new String("self"), 4, 0))), oid, new Expressions(curr_lineno())); :}
+	|  /* self dispatch with parameters */
 		OBJECTID:oid LPAREN comma_expressions:el expression:e RPAREN
-		{: RESULT = new dispatch(curr_lineno(), self, oid, el.appendElement(e)); :}
-	::= 
-
-	::= /* if statement */
+		{: RESULT = new dispatch(curr_lineno(), (new object(curr_lineno(), new IdSymbol(new String("self"), 4, 0))), oid, el.appendElement(e)); :}
+	|  /* if statement */
 		IF expression:e1 THEN expression:e2 ELSE expression:e3 FI
 		{: RESULT = new cond(curr_lineno(), e1, e2, e3); :}
-	::= /* while loop */
+	|  /* while loop */
 		WHILE expression:e1 LOOP expression:e2 POOL
 		{: RESULT = new loop(curr_lineno(), e1, e2); :}
-	::= /* expr_list */
-		LBRACE expressions:el RBRACE
+	|  /* expr_list */
+		LBRACE semi_expressions:el RBRACE
 		{: RESULT = new block(curr_lineno(), el); :} 
-	::= /* let statement TODO */ 
-		LET_STMT OBJECTID:oid TYPEID:tid  
-	::= /* case statement */
+	/* let statement TODO */ 
+ 
+	|  /* case statement */
 		CASE expression:e case_list:cl ESAC
-		{: RESULT = new typecase(curr_lineno(), e, cl); 	:}
-	::= /* new */
+		{: RESULT = new typcase(curr_lineno(), e, cl); :}
+	|  /* new */
 		NEW TYPEID:tid
 		{: RESULT = new new_(curr_lineno(), tid); :}
-	::= /* isvoid */
+	|  /* isvoid */
 		ISVOID expression:e
 		{: RESULT = new isvoid(curr_lineno(), e); :}
-	::= /* subtraction */
+	|  /* subtraction */
 		expression:e1 MINUS expression:e2
 		{: RESULT = new sub(curr_lineno(), e1, e2); :}
-	::= /* addition */
+	|  /* addition */
 		expression:e1 PLUS expression:e2
 		{: RESULT = new plus(curr_lineno(), e1, e2); :}
-	::= /* multiplication */
+	|  /* multiplication */
 		expression:e1 MULT expression:e2
-		{: RESULT = new mult(curr_lineno(), e1, e2); :} 
-	::= /* division */
+		{: RESULT = new mul(curr_lineno(), e1, e2); :} 
+	|  /* division */
 		expression:e1 DIV expression:e2
 		{: RESULT = new divide(curr_lineno(), e1, e2); :}
-	::= /* negation */
+	|  /* negation */
 		NEG expression:e
 		{: RESULT = new neg(curr_lineno(), e); :} 
-	::= /* less than */	
+	|  /* less than */	
 		expression:e1 LT expression: e2
 		{: RESULT = new lt(curr_lineno(), e1, e2); :}
-	::= /* less than equal to */ 
+	|  /* less than equal to */ 
 		expression:e1 LT EQ expression:e2
 		{: RESULT = new leq(curr_lineno(), e1, e2); :}
-	::= /* equal */
+	|  /* equal */
 		expression:e1 EQ expression:e2
 		{: RESULT = new eq(curr_lineno(), e1, e2); :}
-	::= /* not */ 
+	|  /* not */ 
 		NOT expression:e
-		{: RESULT = new no_expr(curr_lineno(), e); :}
-	::= /* parentheses */ 
+		{: RESULT = new comp(curr_lineno(), e); :}
+	|  /* parentheses */ 
 		LPAREN expression:e RPAREN
 		{: RESULT = e; :}
-	::= /* object */ 
+	|  /* object */ 
 		OBJECTID:oid
 		{: RESULT = new object(curr_lineno(), oid); :}
-	::= /* string constant */ 
+	|  /* string constant */ 
 		STR_CONST:s
 		{: RESULT = new string_const(curr_lineno(), s); :}
-	::= /* integer constant */ 
+	|  /* integer constant */ 
 		INT_CONST:i
 		{: RESULT = new int_const(curr_lineno(), i); :}
-	::= /* boolean constant */ 
+	|  /* boolean constant */ 
 		BOOL_CONST:b
 		{: RESULT = new bool_const(curr_lineno(), b); :}
-
+	;
 
 
 
@@ -276,8 +281,6 @@ expression
 
 
 	
-
-
 
 
 
