@@ -78,6 +78,17 @@ nonterminal Cases case_list;
 
 /* Precedence declarations go here. */
 
+precedence right ASSIGN;
+precedence right NOT;
+precedence nonassoc LT, EQ;
+precedence left MINUS, PLUS;
+precedence left DIV, MULT;
+precedence right NEG;
+precedence right ISVOID;
+precedence right AT;
+precedence right DOT;
+
+
 program	
 	::= class_list:cl
 	    {: RESULT = new programc(curr_lineno(), cl); :}
@@ -164,15 +175,17 @@ semi_expressions
 		semi_expressions:el expression:e SEMI
 		{: RESULT = el.appendElement(e); :}
 	|	/* error production */
-		semi_expressions:el error
-		{: RESULT = el; :}
+		semi_expressions:el error expression:e SEMI
+		{: RESULT = el.appendElement(e); :}
+
+
 	;
 
 comma_expressions
 	::= /* empty */
 		{: RESULT = new Expressions(curr_lineno()); :}
 	|  /* non-empty */
-		comma_expressions:el COMMA expression:e
+		comma_expressions:el expression:e COMMA
 		{: RESULT = el.appendElement(e); :}
 	;
 
